@@ -5,16 +5,10 @@ import torch
 import easyocr
 import cv2
 from omegaconf import DictConfig
-from typing import List
 from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
-from ultralytics.yolo.utils.plotting import Annotator
-import datetime
-import pandas as pd  # Add import for pandas
-
-# Define a global dataframe to store the detection information
-detection_data = pd.DataFrame(columns=['Timestamp', 'NumberPlate', 'FrameNumber', 'Confidence'])
+from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
 
 def getOCR(im, coors):
     x, y, w, h = int(coors[0]), int(coors[1]), int(coors[2]), int(coors[3])
@@ -70,23 +64,39 @@ class DetectionPredictor(BasePredictor):
         else:
             frame = getattr(self.dataset, 'frame', 0)
 
-        # Retrieve timestamp
-        timestamp = datetime.datetime.now()
+        self.data_path = p
+        self.txt_path = str(self.save_dir / 'labels' / p.stem) + ('' if self.dataset.mode == 'image' else f'_{frame}')
+        log_string += '%gx%g ' % im.shape[2:]  # print string
+        self.annotator = self.get_annotator(im0)
 
-        # Store detection information in the global dataframe
+        # Initialize CSV file for storing license plate information
+        csv_filename = f"license_plate_info_{frame}.csv"
+        csv_filepath = str(self.save_dir / csv_filename)
+        with open(csv_filepath, 'w') as csv_file:
+            csv_file.write("License Plate, Timestamp, Location\n")
+
         det = preds[idx]
+        self.all_outputs.append(det)
+        if len(det) == 0:
+            return log_string
+
+        for c in det[:, 5].unique():
+            n = (det[:, 5] == c).sum()  # detections per class
+            log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "
+
         for *xyxy, conf, cls in reversed(det):
             c = int(cls)  # integer class
             label = None if self.args.hide_labels else (
                 self.model.names[c] if self.args.hide_conf else f'{self.model.names[c]} {conf:.2f}')
-            ocr = getOCR(im0.cpu().numpy(), xyxy)  # Move im0 to CPU before passing to getOCR
-
-            # Convert xyxy coordinates to CPU before storing
-            xyxy = [coord.cpu().numpy() if isinstance(coord, torch.Tensor) and coord.is_cuda else coord for coord in xyxy]
-
+            ocr = getOCR(im0, xyxy)
             if ocr != "":
                 label = ocr
-                detection_data.loc[len(detection_data)] = [timestamp, label, frame, conf]
+
+                # Append license plate information to CSV file
+                with open(csv_filepath, 'a') as csv_file:
+                    csv_file.write(f"{label}, {self.dataset.timestamp}, {self.dataset.location}\n")
+
+            self.annotator.box_label(xyxy, label, color=colors(c, True))
 
         return log_string
 
@@ -109,5 +119,3 @@ if __name__ == "__main__":
     # Add video paths as command line arguments
     predict()
 
-# Save the detection data to a CSV file
-detection_data.to_csv('/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR/detection_data.csv', index=False)
