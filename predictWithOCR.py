@@ -4,9 +4,8 @@ import hydra
 import torch
 import easyocr
 import cv2
-import glob
 from omegaconf import DictConfig
-from torch.utils.data import Dataset  # Import Dataset class from torch.utils.data
+from typing import List
 from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
@@ -30,29 +29,8 @@ def getOCR(im, coors):
 
     return str(ocr)
 
-class LoadImagesWithTimestamp(Dataset):
-    def __init__(self, path, img_size=416):
-        self.img_files = [f for f in glob.glob(f"{path}/*.jpg")]
-        self.img_size = img_size
-
-    def __len__(self):
-        return len(self.img_files)
-
-    def __getitem__(self, index):
-        img_path = self.img_files[index % len(self.img_files)]
-        img, img0 = load_image(img_path, self.img_size)
-
-        # Use the current system time as the timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        location = get_location_from_filename(img_path)
-
-        return img_path, img, img0, timestamp, location
-
-def get_location_from_filename(filename):
-    # Use a default location for demonstration purposes
-    return "Demo_Location"
-
 class DetectionPredictor(BasePredictor):
+
     def get_annotator(self, img):
         return Annotator(img, line_width=self.args.line_thickness, example=str(self.model.names))
 
@@ -76,7 +54,7 @@ class DetectionPredictor(BasePredictor):
         return preds
 
     def write_results(self, idx, preds, batch):
-        p, im, im0, timestamp, location = batch
+        p, im, im0 = batch
         log_string = ""
         if len(im.shape) == 3:
             im = im[None]  # expand for batch dim
@@ -94,10 +72,13 @@ class DetectionPredictor(BasePredictor):
         self.annotator = self.get_annotator(im0)
 
         # Initialize CSV file for storing license plate information
-        csv_filename = f"license_plate_info_{frame}.csv"
+        csv_filename = f"license_plate_info_all.csv"
         csv_filepath = str(self.save_dir / csv_filename)
         with open(csv_filepath, 'w') as csv_file:
-            csv_file.write("License Plate, Timestamp, Location\n")
+            csv_file.write("License Plate, Timestamp\n")
+
+        # Initialize set to store detected license plates and their first detection timestamps
+        detected_plates = set()
 
         det = preds[idx]
         self.all_outputs.append(det)
@@ -109,18 +90,35 @@ class DetectionPredictor(BasePredictor):
             log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "
 
         for *xyxy, conf, cls in reversed(det):
-            c = int(cls)  # integer class
-            label = None if self.args.hide_labels else (
-                self.model.names[c] if self.args.hide_conf else f'{self.model.names[c]} {conf:.2f}')
-            ocr = getOCR(im0, xyxy)
-            if ocr != "":
-                label = ocr
+            if self.args.save_txt:  # Write to file
+                xywh = (ops.xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                line = (cls, *xywh, conf) if self.args.save_conf else (cls, *xywh)  # label format
+                with open(f'{self.txt_path}.txt', 'a') as f:
+                    f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                # Append license plate information to CSV file
-                with open(csv_filepath, 'a') as csv_file:
-                    csv_file.write(f"{label}, {timestamp}, {location}\n")
+            if self.args.save or self.args.save_crop or self.args.show:  # Add bbox to image
+                c = int(cls)  # integer class
+                label = None if self.args.hide_labels else (
+                    self.model.names[c] if self.args.hide_conf else f'{self.model.names[c]} {conf:.2f}')
+                ocr = getOCR(im0, xyxy)
+                if ocr != "":
+                    label = ocr
 
-            self.annotator.box_label(xyxy, label, color=colors(c, True))
+                # Append license plate information to the CSV file only if it's the first detection
+                if label not in detected_plates:
+                    with open(csv_filepath, 'a') as csv_file:
+                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        csv_file.write(f"{label}, {timestamp}\n")
+                    
+                    detected_plates.add(label)  # Add to set to track the first detection
+
+                self.annotator.box_label(xyxy, label, color=colors(c, True))
+            if self.args.save_crop:
+                imc = im0.copy()
+                save_one_box(xyxy,
+                             imc,
+                             file=self.save_dir / 'crops' / self.model.model.names[c] / f'{self.data_path.stem}.jpg',
+                             BGR=True)
 
         return log_string
 
@@ -135,8 +133,7 @@ def predict(cfg: DictConfig):
 
     for video_path in video_paths:
         cfg.source = video_path
-        dataset = LoadImagesWithTimestamp(cfg.source, img_size=cfg.imgsz)
-        predictor = DetectionPredictor(cfg, dataset)
+        predictor = DetectionPredictor(cfg)
         predictor()
 
 if __name__ == "__main__":
