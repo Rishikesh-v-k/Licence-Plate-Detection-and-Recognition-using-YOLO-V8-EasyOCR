@@ -4,11 +4,13 @@ import hydra
 import torch
 import easyocr
 import cv2
+import glob
 from omegaconf import DictConfig
 from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
+from datetime import datetime  # Import datetime module for capturing system time
 
 def getOCR(im, coors):
     x, y, w, h = int(coors[0]), int(coors[1]), int(coors[2]), int(coors[3])
@@ -27,8 +29,29 @@ def getOCR(im, coors):
 
     return str(ocr)
 
-class DetectionPredictor(BasePredictor):
+class LoadImagesWithTimestamp(Dataset):
+    def __init__(self, path, img_size=416):
+        self.img_files = [f for f in glob.glob(f"{path}/*.jpg")]
+        self.img_size = img_size
 
+    def __len__(self):
+        return len(self.img_files)
+
+    def __getitem__(self, index):
+        img_path = self.img_files[index % len(self.img_files)]
+        img, img0 = load_image(img_path, self.img_size)
+
+        # Use the current system time as the timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        location = get_location_from_filename(img_path)
+
+        return img_path, img, img0, timestamp, location
+
+def get_location_from_filename(filename):
+    # Use a default location for demonstration purposes
+    return "Demo_Location"
+
+class DetectionPredictor(BasePredictor):
     def get_annotator(self, img):
         return Annotator(img, line_width=self.args.line_thickness, example=str(self.model.names))
 
@@ -52,7 +75,7 @@ class DetectionPredictor(BasePredictor):
         return preds
 
     def write_results(self, idx, preds, batch):
-        p, im, im0 = batch
+        p, im, im0, timestamp, location = batch
         log_string = ""
         if len(im.shape) == 3:
             im = im[None]  # expand for batch dim
@@ -94,7 +117,7 @@ class DetectionPredictor(BasePredictor):
 
                 # Append license plate information to CSV file
                 with open(csv_filepath, 'a') as csv_file:
-                    csv_file.write(f"{label}, {self.dataset.timestamp}, {self.dataset.location}\n")
+                    csv_file.write(f"{label}, {timestamp}, {location}\n")
 
             self.annotator.box_label(xyxy, label, color=colors(c, True))
 
@@ -111,11 +134,11 @@ def predict(cfg: DictConfig):
 
     for video_path in video_paths:
         cfg.source = video_path
-        predictor = DetectionPredictor(cfg)
+        dataset = LoadImagesWithTimestamp(cfg.source, img_size=cfg.imgsz)
+        predictor = DetectionPredictor(cfg, dataset)
         predictor()
 
 if __name__ == "__main__":
     reader = easyocr.Reader(['en'])
     # Add video paths as command line arguments
     predict()
-
