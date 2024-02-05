@@ -6,6 +6,7 @@ import easyocr
 import cv2
 import glob
 from omegaconf import DictConfig
+from torch.utils.data import Dataset  # Import Dataset class from torch.utils.data
 from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
