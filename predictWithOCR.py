@@ -10,7 +10,10 @@ from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
-from datetime import datetime  # Import datetime module for capturing system time
+from datetime import datetime, timezone, timedelta  # Import datetime module for capturing system time
+
+# Define the missing variable gn
+gn = torch.tensor([1.], device='cuda:0')
 
 def getOCR(im, coors):
     x, y, w, h = int(coors[0]), int(coors[1]), int(coors[2]), int(coors[3])
@@ -72,18 +75,19 @@ class DetectionPredictor(BasePredictor):
         self.annotator = self.get_annotator(im0)
 
         # Initialize CSV file for storing license plate information
-        csv_filename = f"license_plate_info_all.csv"
+        csv_filename = "license_plate_info.csv"
         csv_filepath = str(self.save_dir / csv_filename)
         with open(csv_filepath, 'w') as csv_file:
             csv_file.write("License Plate, Timestamp\n")
-
-        # Initialize set to store detected license plates and their first detection timestamps
-        detected_plates = set()
 
         det = preds[idx]
         self.all_outputs.append(det)
         if len(det) == 0:
             return log_string
+
+        # Capture Indian time instead of London time
+        indian_timezone = timezone(timedelta(hours=5, minutes=30))  # UTC+5:30 for Indian Standard Time
+        timestamp = datetime.now(indian_timezone).strftime("%Y-%m-%d %H:%M:%S")
 
         for c in det[:, 5].unique():
             n = (det[:, 5] == c).sum()  # detections per class
@@ -104,13 +108,9 @@ class DetectionPredictor(BasePredictor):
                 if ocr != "":
                     label = ocr
 
-                # Append license plate information to the CSV file only if it's the first detection
-                if label not in detected_plates:
-                    with open(csv_filepath, 'a') as csv_file:
-                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        csv_file.write(f"{label}, {timestamp}\n")
-                    
-                    detected_plates.add(label)  # Add to set to track the first detection
+                # Append license plate information to the CSV file with accurate timestamp
+                with open(csv_filepath, 'a') as csv_file:
+                    csv_file.write(f"{label}, {timestamp}\n")
 
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
             if self.args.save_crop:
