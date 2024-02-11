@@ -11,6 +11,7 @@ from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
 from datetime import datetime, timezone, timedelta  # Import datetime module for capturing system time
+import os
 
 # Define the missing variable gn
 gn = torch.tensor([1.], device='cuda:0')
@@ -75,7 +76,8 @@ class DetectionPredictor(BasePredictor):
         self.annotator = self.get_annotator(im0)
 
         # Initialize CSV file for storing license plate information
-        csv_filename = "license_plate_info.csv"
+        video_name = os.path.splitext(os.path.basename(p))[0]
+        csv_filename = f"{video_name}_license_plate_info.csv"
         csv_filepath = str(self.save_dir / csv_filename)
         with open(csv_filepath, 'w') as csv_file:
             csv_file.write("License Plate, Timestamp\n")
