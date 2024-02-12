@@ -7,5 +7,5 @@ while True:
   key = cv2.waitKey(1) # wait till key press
   if key == ord("q"): # exit Loop on 'q' key press
     break
-cap. release() # release video capture object
-cv2 . destroyA11Windows() # destroy aLL frame windows
+cap.release() # release video capture object
+cv2.destroyA11Windows() # destroy aLL frame windows
