@@ -4,6 +4,7 @@ import hydra
 import torch
 import easyocr
 import cv2
+import re
 from omegaconf import DictConfig
 from typing import List
 from ultralytics.yolo.engine.predictor import BasePredictor
@@ -11,6 +12,7 @@ from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
 from datetime import datetime, timezone, timedelta
+import csv
 
 # Define the missing variable gn
 gn = torch.tensor([1.], device='cuda:0')
@@ -35,6 +37,16 @@ def getOCR(im, coors):
     ocr = ''.join(char for char in ocr if char.isalnum())
 
     return ocr
+
+def is_valid_license_plate(license_plate):
+    # Define the regular expression pattern for Indian license plates
+    pattern = r'^[A-Z]{2}\s?[0-9]{1,2}\s?[A-Z]{1,3}\s?[0-9]{4}$'
+
+    # Check if the license plate string matches the pattern
+    if re.match(pattern, license_plate):
+        return True
+    else:
+        return False
 
 class DetectionPredictor(BasePredictor):
 
@@ -81,11 +93,6 @@ class DetectionPredictor(BasePredictor):
         log_string += '%gx%g ' % im.shape[2:]
         self.annotator = self.get_annotator(im0)
 
-        csv_filename = "license_plate_info.csv"
-        csv_filepath = str(self.save_dir / csv_filename)
-        with open(csv_filepath, 'w') as csv_file:
-            csv_file.write("License Plate, Timestamp\n")
-
         det = preds[idx]
         self.all_outputs.append(det)
         if len(det) == 0:
@@ -113,8 +120,15 @@ class DetectionPredictor(BasePredictor):
                 if ocr != "":
                     label = ocr
 
-                with open(csv_filepath, 'a') as csv_file:
-                    csv_file.write(f"{label}, {timestamp}\n")
+                # Check if the detected license plate is valid for Indian format
+                if label and is_valid_license_plate(label):
+                    # Save license plate and timestamp in the CSV file
+                    if video_index == 0:
+                        if label not in license_plates_timestamps:
+                            license_plates_timestamps[label] = [timestamp, "nill"]
+                    else:
+                        if label in license_plates_timestamps and license_plates_timestamps[label][0] != "nill":
+                            license_plates_timestamps[label][1] = timestamp
 
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
             if self.args.save_crop:
@@ -133,12 +147,42 @@ def predict(cfg: DictConfig):
     cfg.source = cfg.source if cfg.source is not None else ROOT / "assets"
 
     video_paths = cfg.source
+    global video_index
+    video_index = 0
 
     for video_path in video_paths:
         cfg.source = video_path
         predictor = DetectionPredictor(cfg)
         predictor()
+        video_index += 1
+
+    # Calculate the average speed and save to CSV
+    csv_filename = "license_plate_info.csv"
+    if cfg.project is None:
+        csv_filepath = csv_filename
+    else:
+        csv_filepath = str(cfg.project / csv_filename)
+    distance = 1  # Assuming a known distance of 1 km between the two points
+
+    with open(csv_filepath, 'w', newline='') as csv_file:
+        fieldnames = ["License Plate", "Timestamp1", "Timestamp2", "Speed(km/h)"]
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for license_plate, timestamps in license_plates_timestamps.items():
+            timestamp1, timestamp2 = timestamps
+
+            if timestamp1 != "nill" and timestamp2 != "nill":
+                time1 = datetime.strptime(timestamp1, "%Y-%m-%d %H:%M:%S")
+                time2 = datetime.strptime(timestamp2, "%Y-%m-%d %H:%M:%S")
+                time_diff = time2 - time1
+                time_diff_seconds = time_diff.total_seconds()
+                speed = distance / (time_diff_seconds / 3600)  # Convert to km/h
+                writer.writerow({"License Plate": license_plate, "Timestamp1": timestamp1, "Timestamp2": timestamp2, "Speed(km/h)": f"{speed:.2f}"})
+            else:
+                writer.writerow({"License Plate": license_plate, "Timestamp1": timestamp1, "Timestamp2": timestamp2, "Speed(km/h)": "nill"})
 
 if __name__ == "__main__":
     reader = easyocr.Reader(['en'])
+    license_plates_timestamps = {}  # Dictionary to store license plates and timestamps
     predict()
