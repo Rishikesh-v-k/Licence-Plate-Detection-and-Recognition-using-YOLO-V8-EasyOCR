@@ -123,12 +123,13 @@ class DetectionPredictor(BasePredictor):
                 # Check if the detected license plate is valid for Indian format
                 if label and is_valid_license_plate(label):
                     # Save license plate and timestamp in the CSV file
+                    if label not in license_plates_timestamps:
+                        license_plates_timestamps[label] = ["nill", "nill"]
+
                     if video_index == 0:
-                        if label not in license_plates_timestamps:
-                            license_plates_timestamps[label] = [timestamp, "nill"]
+                        license_plates_timestamps[label][0] = timestamp
                     else:
-                        if label in license_plates_timestamps and license_plates_timestamps[label][0] != "nill":
-                            license_plates_timestamps[label][1] = timestamp
+                        license_plates_timestamps[label][1] = timestamp
 
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
             if self.args.save_crop:
@@ -162,7 +163,7 @@ def predict(cfg: DictConfig):
         csv_filepath = csv_filename
     else:
         csv_filepath = str(cfg.project / csv_filename)
-    distance = 1  # Assuming a known distance of 1 km between the two points
+    distance = 10  # Assuming a known distance of 10 km between the two points
 
     with open(csv_filepath, 'w', newline='') as csv_file:
         fieldnames = ["License Plate", "Timestamp1", "Timestamp2", "Speed(km/h)"]
@@ -185,4 +186,4 @@ def predict(cfg: DictConfig):
 if __name__ == "__main__":
     reader = easyocr.Reader(['en'])
     license_plates_timestamps = {}  # Dictionary to store license plates and timestamps
-    predict()
+    predict()  
