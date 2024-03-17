@@ -163,7 +163,7 @@ def predict(cfg: DictConfig):
         csv_filepath = csv_filename
     else:
         csv_filepath = str(cfg.project / csv_filename)
-    distance = 10  # Assuming a known distance of 10 km between the two points
+    distance = 1  # Assuming a known distance of 1 km between the two points
 
     with open(csv_filepath, 'w', newline='') as csv_file:
         fieldnames = ["License Plate", "Timestamp1", "Timestamp2", "Speed(km/h)"]
