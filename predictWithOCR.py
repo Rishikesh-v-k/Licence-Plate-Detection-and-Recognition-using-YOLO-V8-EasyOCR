@@ -1,3 +1,4 @@
+
 # Ultralytics YOLO 🚀, GPL-3.0 license
 
 import hydra
@@ -80,7 +81,7 @@ class DetectionPredictor(BasePredictor):
         csv_filename = f"{video_name}_license_plate_info.csv"
         csv_filepath = str(self.save_dir / csv_filename)
         with open(csv_filepath, 'w') as csv_file:
-            csv_file.write("License Plate, Timestamp\n")
+            csv_file.write("License Plate, Date, Timestamp\n")
 
         det = preds[idx]
         self.all_outputs.append(det)
@@ -89,7 +90,7 @@ class DetectionPredictor(BasePredictor):
 
         # Capture Indian time instead of London time
         indian_timezone = timezone(timedelta(hours=5, minutes=30))  # UTC+5:30 for Indian Standard Time
-        timestamp = datetime.now(indian_timezone).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now(indian_timezone)
 
         for c in det[:, 5].unique():
             n = (det[:, 5] == c).sum()  # detections per class
@@ -111,8 +112,9 @@ class DetectionPredictor(BasePredictor):
                     label = ocr
 
                 # Append license plate information to the CSV file with accurate timestamp
+                timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
                 with open(csv_filepath, 'a') as csv_file:
-                    csv_file.write(f"{label}, {timestamp}\n")
+                    csv_file.write(f"{label}, {timestamp_str.split()[0]}, {timestamp_str.split()[1]}\n")
 
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
             if self.args.save_crop:
