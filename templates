@@ -22,14 +22,22 @@ def read_csv_file(file_path):
         # Skip header row
         next(csv_reader)
         for row in csv_reader:
-            data.append(row)
+            # Convert speed value to float
+            try:
+                speed = float(row[3])
+            except ValueError:
+                # Skip if speed cannot be converted to float
+                continue
+            # Check if speed is greater than 80km/h
+            if speed > 80:
+                data.append(row)  # Append entire row if speed is greater than 80km/h
     return data
 
 @app.route("/")
 def home():
-    # Read data from CSV file
+    # Read data from CSV file with speed > 80km/h
     data_from_csv = read_csv_file(csv_file_path)
-    # Extract label and timestamp from data
+    # Extract label, timestamp1, timestamp2, and speed from filtered data
     label = [row[0] for row in data_from_csv]
     timestamp1 = [row[1] for row in data_from_csv]
     timestamp2 = [row[2] for row in data_from_csv]
