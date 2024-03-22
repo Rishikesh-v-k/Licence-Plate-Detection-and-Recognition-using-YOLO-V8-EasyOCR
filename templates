@@ -11,8 +11,7 @@ import csv
 
 template_folder = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/template"
 static_folder = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/static"
-csv_file_path = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/runs/detect/train/demo1_license_plate_info.csv"
-
+csv_file_path = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/license_plate_info.csv"
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 run_with_ngrok(app)
 
@@ -32,9 +31,11 @@ def home():
     data_from_csv = read_csv_file(csv_file_path)
     # Extract label and timestamp from data
     label = [row[0] for row in data_from_csv]
-    timestamp = [row[1] for row in data_from_csv]
+    timestamp1 = [row[1] for row in data_from_csv]
+    timestamp2 = [row[2] for row in data_from_csv]
+    speed = [row[3] for row in data_from_csv]
     # Pass data to template
-    return render_template('index.html', label=label, timestamp=timestamp, l=len(label))
+    return render_template('index.html', label=label, timestamp1=timestamp1, timestamp2=timestamp2, speed=speed, l=len(label))
 
 if __name__ == "__main__":
     app.run()
