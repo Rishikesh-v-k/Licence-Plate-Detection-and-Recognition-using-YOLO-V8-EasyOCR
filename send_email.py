@@ -51,6 +51,6 @@ if __name__ == "__main__":
     license_plates = get_license_plates(csv_file)
     
     # Create violation details for each license plate
-    violation_details = [f'Vehicle with license plate {plate} exceeded the speed limit by 10 mph.' for plate in license_plates]
+    violation_details = [f'Vehicle with license plate {plate} exceeded the speed limit.' for plate in license_plates]
     
     send_email(sender_email, receiver_emails, password, violation_details)
