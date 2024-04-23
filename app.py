@@ -2,9 +2,9 @@ from flask_ngrok import run_with_ngrok
 from flask import Flask, render_template
 import csv
 
-template_folder = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/template"
-static_folder = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/static"
-csv_file_path = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/license_plate_info.csv"
+template_folder = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR/template"
+static_folder = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR/static"
+csv_file_path = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR/license_plate_info.csv"
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 run_with_ngrok(app)
 
