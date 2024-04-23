@@ -42,10 +42,10 @@ def send_email(sender_email, receiver_emails, password, violation_details):
 
 # Example usage:
 if __name__ == "__main__":
-    sender_email = 'sjn4433@gmail.com'
-    receiver_emails = ['sajinsjn4433@gmail.com', 'sajin6427@gmail.com']  # List of receiver emails
+    sender_email = 'rishikeshvk007@gmail.com'
+    receiver_emails = ['sanjusibi02@gmail.com', 'sajin6427@gmail.com','rishikesh.cse20@jecc.ac.in']  # List of receiver emails
     password = 'ghkr snfe wupy xfxh'
-    csv_file = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR-Modified/license_plate_info.csv"
+    csv_file = "/content/Licence-Plate-Detection-and-Recognition-using-YOLO-V8-EasyOCR/license_plate_info.csv"
     
     # Fetch license plate numbers from CSV file
     license_plates = get_license_plates(csv_file)
